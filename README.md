@@ -790,3 +790,113 @@ Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
 
 - `confirm()` dialogs should be replaced with a proper modal component
 - No rate limiting on `/api/chat`
+
+---
+
+## Deployment
+
+This app is designed for **local use** — the LLM never leaves your machine. The Next.js frontend and API layer can also be deployed to a server so teammates on the same network or VPN can share one LM Studio instance.
+
+### Option 1 — Local machine (default)
+
+```bash
+npm run dev          # development, hot-reload → http://localhost:3000
+npm run build && npm start   # production build → http://localhost:3000
+```
+
+### Option 2 — Local network (share with teammates)
+
+Bind to all interfaces so other machines on the network can reach the app:
+
+```bash
+npm run build
+npx next start -H 0.0.0.0 -p 3000
+```
+
+Find your IP: `ifconfig | grep "inet "` (macOS/Linux) or `ipconfig` (Windows).  
+Share `http://<your-ip>:3000` with teammates.
+
+Update `.env.local`:
+```env
+NEXTAUTH_URL=http://<your-local-ip>:3000
+```
+
+Add that URL as an Authorised Redirect URI in Google Cloud Console.
+
+### Option 3 — Vercel (cloud)
+
+> ⚠️ LM Studio must be publicly reachable (or on a VPN) — the app proxies requests to it but does not run the model itself.
+
+```bash
+npm install -g vercel
+vercel
+```
+
+Set these in the Vercel dashboard (Project → Settings → Environment Variables):
+
+| Variable | Value |
+|----------|-------|
+| `LLM_BASE_URL` | Your LM Studio URL (must be reachable from Vercel) |
+| `LLM_API_PATH` | `/v1/chat/completions` |
+| `AUTH_SECRET` | 32-byte hex secret |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `NEXTAUTH_URL` | `https://your-app.vercel.app` |
+
+Update Google Cloud Console → Authorised Redirect URIs:
+```
+https://your-app.vercel.app/api/auth/callback/google
+```
+
+### Option 4 — Docker (self-hosted)
+
+Add `output: "standalone"` to `next.config.ts`:
+```ts
+const nextConfig: NextConfig = {
+  output: "standalone",
+  images: { remotePatterns: [{ protocol: "https", hostname: "lh3.googleusercontent.com" }] },
+};
+```
+
+Create `Dockerfile` at the project root:
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+Build and run:
+```bash
+docker build -t local-ai-chat .
+docker run -p 3000:3000 \
+  -e AUTH_SECRET=... \
+  -e AUTH_GOOGLE_ID=... \
+  -e AUTH_GOOGLE_SECRET=... \
+  -e NEXTAUTH_URL=http://localhost:3000 \
+  -e LLM_BASE_URL=http://host.docker.internal:1234 \
+  -e LLM_API_PATH=/v1/chat/completions \
+  local-ai-chat
+```
+
+`host.docker.internal` resolves to the host machine from inside Docker, letting the container reach LM Studio on your Mac/PC.
+
+### Pre-deployment checklist
+
+- [ ] `AUTH_SECRET` is a strong random value (not the default from this repo)
+- [ ] `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are set
+- [ ] `NEXTAUTH_URL` matches the exact URL users will access (including protocol and port)
+- [ ] Google Cloud Console redirect URI matches `NEXTAUTH_URL/api/auth/callback/google`
+- [ ] LM Studio is running and reachable from the deployment environment
+- [ ] `.env.local` is **not** committed (it is in `.gitignore` by default in Next.js)
