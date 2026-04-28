@@ -116,5 +116,7 @@ docker run -p 3000:3000 \
 - [ ] Google Cloud Console redirect URI = `NEXTAUTH_URL` + `/api/auth/callback/google`
 - [ ] LM Studio is running and reachable from the deployment environment
 - [ ] `.env.local` is **not** committed (it is in `.gitignore` by default)
+- [ ] Firestore security rules deployed: `firebase deploy --only firestore:rules`
+- [ ] Firestore indexes deployed: `firebase deploy --only firestore:indexes`
 - [ ] `npm run build` passes with 0 errors
 - [ ] `npm run lint` passes with 0 errors and 0 warnings

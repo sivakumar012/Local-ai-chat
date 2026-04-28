@@ -127,6 +127,9 @@ typescript ^5
 local-ai-chat/
 ├── auth.ts                              # NextAuth config — Google provider, session callback
 ├── proxy.ts                             # Next.js proxy middleware — route protection
+├── firebase.json                        # Firebase project config (Firestore rules + indexes)
+├── firestore.rules                      # Firestore security rules (owner-only, field validation)
+├── firestore.indexes.json               # Composite index definitions
 ├── app/
 │   ├── api/
 │   │   ├── auth/[...nextauth]/
@@ -146,8 +149,10 @@ local-ai-chat/
 │   │   └── SessionProviderWrapper.tsx   # Client wrapper for NextAuth SessionProvider
 │   ├── lib/
 │   │   ├── types.ts                     # Shared TypeScript interfaces and constants
-│   │   ├── llm.ts                       # LLM HTTP client (streamChat function)
-│   │   └── tokenUtils.ts                # Token estimation and context window trimming
+│   │   ├── tokenUtils.ts                # Token estimation and context window trimming
+│   │   ├── firebase.ts                  # Firebase app + Firestore db singleton
+│   │   ├── firestoreService.ts          # All Firestore read/write operations (service layer)
+│   │   └── logger.ts                    # Structured logger — JSON in prod, colour in dev
 │   ├── login/
 │   │   └── page.tsx                     # Google sign-in page
 │   ├── store/
@@ -387,6 +392,107 @@ interface UserState {
   resetSetup: () => void
 }
 ```
+
+---
+
+## Firestore Integration
+
+Conversations, messages, and user preferences are persisted to **Cloud Firestore** (Firebase project `prepforexams-aabbd`) in addition to localStorage. This enables cross-device access and durable storage.
+
+### Data layout
+
+```
+/users/{userId}                                    ← user preferences
+/users/{userId}/conversations/{id}                 ← conversation metadata
+/users/{userId}/conversations/{id}/messages/{id}   ← individual messages
+```
+
+`userId` is the Google `sub` from the NextAuth session (`session.user.id`).
+
+### Service layer
+
+All Firestore operations go through `app/lib/firestoreService.ts`. Never call the Firestore SDK directly from components or stores.
+
+| Function | Purpose |
+|----------|---------|
+| `saveConversation` | Upsert conversation metadata |
+| `loadConversations` | List all conversations for a user, ordered by `updatedAt` desc |
+| `deleteConversation` | Batch-delete conversation + all child messages atomically |
+| `updateConversationMeta` | Patch title / settings / updatedAt |
+| `saveMessage` | Append a single message |
+| `loadMessages` | Load all messages ordered by `createdAt` asc |
+| `updateMessageContent` | Update content after streaming completes |
+| `deleteMessage` | Remove a single message |
+| `saveUserPrefs` | Persist `llmBaseUrl` + `setupComplete` |
+| `loadUserPrefs` | Load user prefs (returns `null` for new users) |
+
+### Security rules
+
+Rules are in `firestore.rules` and deployed to Firebase. Key invariants:
+
+- Every read/write requires `request.auth != null`
+- Users can only access their own documents (`request.auth.uid == userId`)
+- `userId` field in written documents must equal the caller's uid
+- Message content capped at 32 768 chars; title capped at 200 chars
+- Messages are **immutable** once written (no update via rules)
+- Catch-all deny — everything not explicitly allowed is blocked
+
+Deploy rules:
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
+
+---
+
+## Observability & Logging
+
+All structured logging goes through `app/lib/logger.ts`. Never use `console.log` directly in application code.
+
+```ts
+import { logger } from "@/app/lib/logger";
+
+logger.info("api.chat.request", { model, messageCount });
+logger.error("firestore.message.save.failed", { error: err.message, messageId });
+```
+
+### Output by environment
+
+| Environment | Format | Destination |
+|-------------|--------|-------------|
+| `development` | Colour-coded human-readable | console |
+| `production` | JSON lines (one object per line) | stdout |
+
+### JSON line shape (production)
+
+```json
+{
+  "level": "info",
+  "event": "api.chat.stream.done",
+  "timestamp": "2026-04-28T10:23:45.123Z",
+  "model": "gemma-4-e4b",
+  "tokenCount": 142,
+  "durationMs": 3210
+}
+```
+
+JSON lines on stdout are compatible with **CloudWatch Logs**, **Datadog**, **GCP Cloud Logging**, and any log aggregator that reads container stdout. To add CloudWatch alarms or dashboards, activate the `aws-observability` power in Kiro.
+
+### Event naming convention
+
+`<layer>.<entity>.<action>[.failed]`
+
+| Layer | Example events |
+|-------|---------------|
+| `api` | `api.chat.request`, `api.chat.stream.done`, `api.chat.llm.unreachable` |
+| `firestore` | `firestore.conversation.save`, `firestore.message.load.failed` |
+| `auth` | `auth.session.missing`, `auth.redirect` |
+
+### What is never logged
+
+- Passwords, tokens, API keys, or `AUTH_SECRET`
+- Full message content (potential PII) — only `messageId` and `role` are logged
+- Raw stack traces — only `err.message` is logged
 
 ---
 
@@ -669,52 +775,24 @@ npm start
 
 ## Persistence
 
-Two localStorage keys:
+### localStorage (client-side, always active)
 
 | Key | Contents |
 |-----|---------|
-| local-ai-chat-store | All conversations, messages, active conversation ID |
-| local-ai-chat-user-prefs | llmBaseUrl, setupComplete flag |
+| `local-ai-chat-store` | All conversations, messages, active conversation ID |
+| `local-ai-chat-user-prefs` | `llmBaseUrl`, `setupComplete` flag |
 
-Both are managed by Zustand's persist middleware and survive page refreshes and browser restarts. Data is per-browser and per-origin (http://localhost:3000).
+Both are managed by Zustand's `persist` middleware and survive page refreshes and browser restarts. Data is per-browser and per-origin.
 
-To reset the setup screen (re-show the URL configuration): call useUserStore.getState().resetSetup() from the browser console, or clear localStorage.
+### Firestore (cloud, requires sign-in)
 
----
+All data is also written to Firestore under `/users/{userId}/...` using the service layer in `app/lib/firestoreService.ts`. This enables:
 
-## Upgrading to SQLite (v2)
+- Cross-device access — sign in on any browser and your conversations are there
+- Durable storage — data survives clearing localStorage
+- Multi-user isolation — each user's data is strictly separated by security rules
 
-To persist data in a local SQLite database instead of localStorage:
-
-```bash
-npm install prisma @prisma/client
-npx prisma init --datasource-provider sqlite
-```
-
-Schema (prisma/schema.prisma):
-```prisma
-model Conversation {
-  id          String    @id @default(cuid())
-  title       String
-  model       String    @default("gemma-4-e4b")
-  temperature Float     @default(0.7)
-  maxTokens   Int       @default(1000)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  messages    Message[]
-}
-
-model Message {
-  id             String       @id @default(cuid())
-  role           String
-  content        String
-  createdAt      DateTime     @default(now())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  conversationId String
-}
-```
-
-Then create API routes for conversations and messages backed by Prisma, and replace the Zustand persist middleware with fetch calls to those routes.
+To reset the setup screen (re-show the URL configuration): call `useUserStore.getState().resetSetup()` from the browser console, or clear localStorage.
 
 ---
 
@@ -757,7 +835,7 @@ Then create API routes for conversations and messages backed by Prisma, and repl
 
 Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
 
-### ✅ Done (v0.1 + v0.2)
+### ✅ Done (v0.1 → v0.3)
 
 - Core chat UI — sidebar, message bubbles, auto-scroll, markdown, code highlighting
 - Streaming responses (SSE) with stop-generation support
@@ -770,7 +848,9 @@ Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
 - First-run LM Studio URL setup screen with connection test
 - User preferences store (URL, setup state) persisted to localStorage
 - Inline URL editor in sidebar footer
-- Lint clean — 0 errors, 0 warnings
+- **Firestore integration** — conversations, messages, and user prefs persisted to Cloud Firestore
+- **Firestore security rules** — owner-only access, field validation, immutable messages, catch-all deny
+- **Structured observability** — JSON-line logger on all API routes and Firestore operations
 
 ### ⬜ Planned
 
@@ -802,6 +882,20 @@ Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
 
 This app is designed for **local use** — the LLM never leaves your machine. The Next.js frontend and API layer can also be deployed to a server so teammates on the same network or VPN can share one LM Studio instance.
 
+### Pre-deployment checklist
+
+- [ ] `AUTH_SECRET` is a strong random value:
+  ```bash
+  node -e "const c=require('crypto'); console.log(c.randomBytes(32).toString('hex'))"
+  ```
+- [ ] `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are real credentials
+- [ ] `NEXTAUTH_URL` exactly matches the URL users will access (protocol + domain + port)
+- [ ] Google Cloud Console redirect URI = `NEXTAUTH_URL` + `/api/auth/callback/google`
+- [ ] LM Studio is running and reachable from the deployment environment
+- [ ] `.env.local` is **not** committed (it is in `.gitignore`)
+- [ ] Firestore rules deployed: `firebase deploy --only firestore`
+- [ ] `npm run build` passes with 0 errors
+
 ### Option 1 — Local machine (default)
 
 ```bash
@@ -818,7 +912,7 @@ npm run build
 npx next start -H 0.0.0.0 -p 3000
 ```
 
-Find your IP: `ifconfig | grep "inet "` (macOS/Linux) or `ipconfig` (Windows).  
+Find your IP: `ifconfig | grep "inet "` (macOS/Linux) or `ipconfig` (Windows).
 Share `http://<your-ip>:3000` with teammates.
 
 Update `.env.local`:
@@ -878,6 +972,25 @@ ENV NODE_ENV=production
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+Build and run:
+```bash
+docker build -t local-ai-chat .
+
+docker run -p 3000:3000 \
+  -e AUTH_SECRET=<your-secret> \
+  -e AUTH_GOOGLE_ID=<client-id> \
+  -e AUTH_GOOGLE_SECRET=<client-secret> \
+  -e NEXTAUTH_URL=http://localhost:3000 \
+  -e LLM_BASE_URL=http://host.docker.internal:1234 \
+  -e LLM_API_PATH=/v1/chat/completions \
+  local-ai-chat
+```
+
+`host.docker.internal` resolves to the host machine from inside Docker — lets the container reach LM Studio on your Mac/PC.-from=builder /app/public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]
 ```
