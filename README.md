@@ -1,33 +1,35 @@
 # Local AI Chat
 
-A production-ready, full-stack ChatGPT-like interface that runs entirely on your local machine. Connects to LM Studio (or any OpenAI-compatible local LLM server) via a streaming API. No cloud inference — your conversations never leave your machine.
+A production-ready, full-stack ChatGPT-like interface that runs entirely on your local machine. Connects to [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible server) via streaming API. No cloud inference — conversations never leave your machine.
 
 ---
 
 ## Table of Contents
 
-1. Features
-2. Tech Stack
-3. Dependencies
-4. Project Structure
-5. Architecture Overview
-6. Authentication — Google SSO
-7. First-Run Setup — LM Studio URL
-8. User Preferences Store
-9. Data Model
-10. State Management
-11. Streaming Pipeline
-12. Token Management
-13. API Reference
-14. Component Reference
-15. Environment Configuration
-16. Google OAuth Setup
-17. Setup and Running
-18. Usage Guide
-19. Error Handling
-20. Persistence
-21. Upgrading to SQLite (v2)
-22. Troubleshooting
+1. [Features](#features)
+2. [Tech Stack](#tech-stack)
+3. [Dependencies](#dependencies)
+4. [Project Structure](#project-structure)
+5. [Architecture Overview](#architecture-overview)
+6. [Authentication — Google SSO](#authentication--google-sso)
+7. [First-Run Setup — LM Studio URL](#first-run-setup--lm-studio-url)
+8. [User Preferences Store](#user-preferences-store)
+9. [Data Model](#data-model)
+10. [State Management](#state-management)
+11. [Firestore Integration](#firestore-integration)
+12. [Observability & Logging](#observability--logging)
+13. [Streaming Pipeline](#streaming-pipeline)
+14. [Token Management](#token-management)
+15. [API Reference](#api-reference)
+16. [Component Reference](#component-reference)
+17. [Environment Configuration](#environment-configuration)
+18. [Google OAuth Setup](#google-oauth-setup)
+19. [Setup and Running](#setup-and-running)
+20. [Usage Guide](#usage-guide)
+21. [Error Handling](#error-handling)
+22. [Persistence](#persistence)
+23. [Deployment](#deployment)
+24. [Troubleshooting](#troubleshooting)
 
 ---
 
