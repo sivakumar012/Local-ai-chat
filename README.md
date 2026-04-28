@@ -43,14 +43,14 @@ A production-ready, full-stack ChatGPT-like interface that runs entirely on your
 | Auth | Sign-out button in sidebar |
 | Setup | First-run server URL screen — enter your LM Studio URL before chatting |
 | Setup | Test Connection button — probes /v1/models to verify reachability |
-| Setup | URL persisted to localStorage under user preferences |
+| Setup | URL persisted to localStorage and Firestore under user preferences |
 | Setup | URL editable at any time from the sidebar footer |
 | Chat | Multi-session conversations with independent history |
 | Streaming | Token-by-token response streaming with live cursor indicator |
 | Stop | Abort generation mid-stream, keeping the partial response |
 | Markdown | Full markdown rendering in assistant messages (GFM) |
 | Code | Syntax-highlighted code blocks (Prism, One Dark theme) |
-| Persistence | All conversations auto-saved to localStorage |
+| Persistence | All conversations auto-saved to localStorage + Firestore |
 | Model controls | Per-conversation model name, temperature, and max tokens |
 | Context trimming | Oldest messages automatically dropped when nearing 8k token limit |
 | Auto-title | Conversation title set from the first user message (40 chars) |
@@ -61,6 +61,7 @@ A production-ready, full-stack ChatGPT-like interface that runs entirely on your
 | Rename | Inline rename of conversations in the sidebar |
 | Responsive | Collapsible sidebar with mobile overlay |
 | Error display | Inline error banner with dismiss, error written into assistant bubble |
+| Observability | Structured JSON logging on all API routes and Firestore operations |
 
 ---
 
@@ -79,6 +80,7 @@ A production-ready, full-stack ChatGPT-like interface that runs entirely on your
 | Syntax highlighting | react-syntax-highlighter (Prism) | 16.x | Code block highlighting, One Dark theme |
 | Icons | @heroicons/react | 2.x | SVG icon set (outline + solid) |
 | IDs | uuid (v4) | 14.x | Collision-resistant unique IDs for messages and conversations |
+| Database | Firebase Firestore | 12.x | Cloud NoSQL — cross-device conversation persistence |
 | LLM backend | LM Studio | any | Local OpenAI-compatible inference server |
 
 ---
