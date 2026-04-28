@@ -22,31 +22,13 @@ import { v4 as uuidv4 } from "uuid";
 import { chunkText, MAX_FILE_SIZE_BYTES, SUPPORTED_EXTENSIONS } from "@/app/lib/ragUtils";
 import { logger } from "@/app/lib/logger";
 import type { RagDocument, RagChunk } from "@/app/lib/types";
-
-// Firebase Admin SDK — server-side only, bypasses client security rules
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminDb, isAdminConfigured } from "@/app/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 
 const DEFAULT_BASE_URL = process.env.LLM_BASE_URL ?? "http://127.0.0.1:1234";
 const EMBEDDING_MODEL =
   process.env.EMBEDDING_MODEL ?? "text-embedding-nomic-embed-text-v1.5";
-
-// ─── Firebase Admin singleton ─────────────────────────────────────────────────
-
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  // Use Application Default Credentials (works locally with `gcloud auth` or
-  // GOOGLE_APPLICATION_CREDENTIALS env var, and automatically on Firebase/GCP hosting)
-  return initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID ?? "prepforexams-aabbd",
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
-    }),
-  });
-}
 
 // ─── Embedding helper ─────────────────────────────────────────────────────────
 
@@ -93,6 +75,13 @@ async function extractText(file: File): Promise<string> {
 
 export async function POST(req: NextRequest) {
   const start = Date.now();
+
+  if (!isAdminConfigured()) {
+    return Response.json(
+      { error: "Firebase Admin SDK not configured. Add FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY to .env.local — see DEPLOYMENT.md for setup instructions." },
+      { status: 503 }
+    );
+  }
 
   // Auth check
   const session = await auth();
@@ -144,9 +133,8 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     };
 
-    const adminApp = getAdminApp();
-    const db = getFirestore(adminApp);
-    const docRef = db.doc(`users/${userId}/documents/${documentId}`);
+    const adminDb = getAdminDb();
+    const docRef = adminDb.doc(`users/${userId}/documents/${documentId}`);
     await docRef.set(ragDoc);
 
     // Extract text
@@ -198,9 +186,9 @@ export async function POST(req: NextRequest) {
     // Persist chunks in Firestore batches (max 500 per batch)
     const BATCH_SIZE = 500;
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-      const batch = db.batch();
+      const batch = adminDb.batch();
       chunks.slice(i, i + BATCH_SIZE).forEach((chunk) => {
-        batch.set(db.doc(`users/${userId}/documents/${documentId}/chunks/${chunk.id}`), chunk);
+        batch.set(adminDb.doc(`users/${userId}/documents/${documentId}/chunks/${chunk.id}`), chunk);
       });
       await batch.commit();
     }

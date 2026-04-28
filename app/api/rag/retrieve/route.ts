@@ -15,10 +15,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { logger } from "@/app/lib/logger";
 import { RAG_TOP_K } from "@/app/lib/types";
-
-// Firebase Admin SDK
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminDb, isAdminConfigured } from "@/app/lib/firebaseAdmin";
 import type { RagDocument, RagChunk, RagResult } from "@/app/lib/types";
 import { cosineSimilarity } from "@/app/lib/ragUtils";
 
@@ -27,19 +24,6 @@ export const runtime = "nodejs";
 const DEFAULT_BASE_URL = process.env.LLM_BASE_URL ?? "http://127.0.0.1:1234";
 const EMBEDDING_MODEL =
   process.env.EMBEDDING_MODEL ?? "text-embedding-nomic-embed-text-v1.5";
-
-// ─── Firebase Admin singleton ─────────────────────────────────────────────────
-
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID ?? "prepforexams-aabbd",
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
-    }),
-  });
-}
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
@@ -85,8 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Load all ready documents and their chunks
-    const adminApp = getAdminApp();
-    const db = getFirestore(adminApp);
+    const db = getAdminDb();
 
     const docsSnap = await db
       .collection(`users/${userId}/documents`)

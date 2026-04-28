@@ -37,6 +37,7 @@ export default function RagPanel({ userId, llmBaseUrl, onClose, onDocumentsChang
   const [loading, setLoading] = useState(true);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -46,9 +47,16 @@ export default function RagPanel({ userId, llmBaseUrl, onClose, onDocumentsChang
     try {
       const res = await fetch("/api/rag/documents");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { documents: RagDocument[] };
-      setDocuments(data.documents);
-      onDocumentsChange?.(data.documents.some((d) => d.status === "ready"));
+      const data = await res.json() as { documents: RagDocument[]; setupRequired?: boolean };
+      if (data.setupRequired) {
+        setDocuments([]);
+        setSetupRequired(true);
+        onDocumentsChange?.(false);
+      } else {
+        setDocuments(data.documents);
+        setSetupRequired(false);
+        onDocumentsChange?.(data.documents.some((d) => d.status === "ready"));
+      }
     } catch (err) {
       logger.error("rag.panel.load.failed", { error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -197,42 +205,62 @@ export default function RagPanel({ userId, llmBaseUrl, onClose, onDocumentsChang
         </button>
       </div>
 
-      {/* Drop zone */}
+      {/* Drop zone — hidden when Admin SDK not configured */}
       <div className="px-3 pt-3 shrink-0">
-        <div
-          ref={dropRef}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => uploadState.status !== "uploading" && fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-600 rounded-xl p-4 text-center cursor-pointer transition-colors hover:border-indigo-500 hover:bg-indigo-950/10"
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={SUPPORTED_EXTENSIONS.join(",")}
-            onChange={handleFileChange}
-            className="hidden"
-          />
+        {setupRequired ? (
+          <div className="rounded-xl border border-amber-700/50 bg-amber-900/20 px-3 py-3 space-y-2">
+            <p className="text-xs font-medium text-amber-400">⚙️ Setup required</p>
+            <p className="text-xs text-amber-300/80 leading-relaxed">
+              Add Firebase service account credentials to <code className="bg-gray-800 px-1 rounded">.env.local</code> to enable document upload.
+            </p>
+            <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside leading-relaxed">
+              <li>Open <a href="https://console.firebase.google.com/project/prepforexams-aabbd/settings/serviceaccounts/adminsdk" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Firebase Console → Service Accounts</a></li>
+              <li>Click <strong className="text-gray-300">Generate new private key</strong></li>
+              <li>Add to <code className="bg-gray-800 px-1 rounded">.env.local</code>:
+                <pre className="mt-1 bg-gray-800 rounded p-2 text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap break-all">
+{`FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n..."`}
+                </pre>
+              </li>
+              <li>Restart the server</li>
+            </ol>
+          </div>
+        ) : (
+          <div
+            ref={dropRef}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => uploadState.status !== "uploading" && fileInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-600 rounded-xl p-4 text-center cursor-pointer transition-colors hover:border-indigo-500 hover:bg-indigo-950/10"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={SUPPORTED_EXTENSIONS.join(",")}
+              onChange={handleFileChange}
+              className="hidden"
+            />
 
-          {uploadState.status === "uploading" ? (
-            <div className="space-y-2">
-              <ArrowPathIcon className="w-6 h-6 text-indigo-400 animate-spin mx-auto" />
-              <p className="text-xs text-gray-400 truncate">{uploadState.fileName}</p>
-              <p className="text-xs text-indigo-400">Processing…</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <DocumentArrowUpIcon className="w-6 h-6 text-gray-500 mx-auto" />
-              <p className="text-xs text-gray-400">
-                Drop a file or <span className="text-indigo-400">browse</span>
-              </p>
-              <p className="text-xs text-gray-600">
-                {SUPPORTED_EXTENSIONS.join(", ")} · max {MAX_FILE_SIZE_BYTES / 1024 / 1024} MB
-              </p>
-            </div>
-          )}
-        </div>
+            {uploadState.status === "uploading" ? (
+              <div className="space-y-2">
+                <ArrowPathIcon className="w-6 h-6 text-indigo-400 animate-spin mx-auto" />
+                <p className="text-xs text-gray-400 truncate">{uploadState.fileName}</p>
+                <p className="text-xs text-indigo-400">Processing…</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <DocumentArrowUpIcon className="w-6 h-6 text-gray-500 mx-auto" />
+                <p className="text-xs text-gray-400">
+                  Drop a file or <span className="text-indigo-400">browse</span>
+                </p>
+                <p className="text-xs text-gray-600">
+                  {SUPPORTED_EXTENSIONS.join(", ")} · max {MAX_FILE_SIZE_BYTES / 1024 / 1024} MB
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Upload error */}
         {uploadState.status === "error" && (

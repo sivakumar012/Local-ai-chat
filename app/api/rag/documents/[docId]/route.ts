@@ -6,21 +6,9 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { logger } from "@/app/lib/logger";
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminDb } from "@/app/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
-
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID ?? "prepforexams-aabbd",
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
-    }),
-  });
-}
 
 export async function DELETE(
   _req: NextRequest,
@@ -38,7 +26,7 @@ export async function DELETE(
   }
 
   try {
-    const db = getFirestore(getAdminApp());
+    const db = getAdminDb();
 
     // Verify ownership before deleting
     const docRef = db.doc(`users/${userId}/documents/${docId}`);
