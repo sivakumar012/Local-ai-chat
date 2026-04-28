@@ -153,40 +153,43 @@ export default function AppShell() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden">
-      {/* Mobile sidebar toggle */}
+    <div className="flex h-screen h-[100dvh] bg-gray-950 overflow-hidden">
+      {/* Mobile sidebar toggle — sits inside the header row, not floating */}
       <button
         onClick={() => setSidebarOpen((v) => !v)}
         className="fixed top-3 left-3 z-50 p-2 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 md:hidden"
+        aria-label="Toggle sidebar"
       >
         <Bars3Icon className="w-5 h-5" />
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar — off-canvas on mobile, inline on md+ */}
       <div
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed md:relative md:translate-x-0 z-40 h-full transition-transform duration-200`}
+        } fixed md:relative md:translate-x-0 z-40 h-full h-[100dvh] transition-transform duration-200 ease-in-out`}
       >
         <Sidebar
+          onClose={() => setSidebarOpen(false)}
           userImage={session?.user?.image}
           userName={session?.user?.name}
           userEmail={session?.user?.email}
         />
       </div>
 
-      {/* Overlay for mobile */}
+      {/* Overlay for mobile — closes sidebar on tap */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main chat area — fills remaining width, never overflows */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {error && (
-          <div className="bg-red-900/50 border border-red-700 text-red-300 text-sm px-4 py-2 flex items-center justify-between">
+          <div className="bg-red-900/50 border border-red-700 text-red-300 text-sm px-4 py-2 flex items-center justify-between shrink-0">
             <span>⚠️ {error}</span>
             <button onClick={() => setError(null)} className="ml-4 hover:text-white">
               ✕

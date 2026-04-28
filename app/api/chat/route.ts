@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       messages,
-      model = "gemma-4-e4b",
+      model = "google/gemma-4-e4b",
       temperature = 0.7,
       max_tokens = 1000,
       // Client can pass their configured LM Studio URL; falls back to env

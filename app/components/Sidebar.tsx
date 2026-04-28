@@ -21,9 +21,10 @@ interface Props {
   userImage?: string | null;
   userName?: string | null;
   userEmail?: string | null;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ userImage, userName, userEmail }: Props) {
+export default function Sidebar({ userImage, userName, userEmail, onClose }: Props) {
   const {
     conversations,
     activeId,
@@ -62,8 +63,8 @@ export default function Sidebar({ userImage, userName, userEmail }: Props) {
 
   return (
     <aside className="flex flex-col w-64 min-w-[16rem] h-full bg-gray-900 text-gray-100 border-r border-gray-700">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
+      {/* Header — left-pad on mobile to clear the hamburger button */}
+      <div className="flex items-center justify-between pl-12 pr-4 md:px-4 py-4 border-b border-gray-700 shrink-0">
         <span className="font-semibold text-lg tracking-tight">Local AI Chat</span>
         <button
           onClick={() => createConversation()}
@@ -74,8 +75,8 @@ export default function Sidebar({ userImage, userName, userEmail }: Props) {
         </button>
       </div>
 
-      {/* Conversation list */}
-      <nav className="flex-1 overflow-y-auto py-2 space-y-0.5 px-2">
+      {/* Conversation list — scrollable, fills remaining height */}
+      <nav className="flex-1 overflow-y-auto py-2 space-y-0.5 px-2 overscroll-contain">
         {conversations.length === 0 && (
           <p className="text-gray-500 text-sm text-center mt-8 px-4">
             No conversations yet. Start a new chat!
@@ -84,7 +85,10 @@ export default function Sidebar({ userImage, userName, userEmail }: Props) {
         {conversations.map((conv) => (
           <div
             key={conv.id}
-            onClick={() => selectConversation(conv.id)}
+            onClick={() => {
+              selectConversation(conv.id);
+              onClose?.(); // close sidebar on mobile after selecting
+            }}
             className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
               activeId === conv.id
                 ? "bg-gray-700 text-white"

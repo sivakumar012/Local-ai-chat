@@ -36,7 +36,7 @@ export default function MessageBubble({ message, onDelete, isStreaming }: Props)
         </div>
       )}
 
-      <div className={`flex flex-col gap-1 max-w-[80%] ${isUser ? "items-end" : "items-start"}`}>
+      <div className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[80%] ${isUser ? "items-end" : "items-start"}`}>
         <div
           className={`relative rounded-2xl px-4 py-3 text-sm leading-relaxed ${
             isUser
@@ -55,18 +55,20 @@ export default function MessageBubble({ message, onDelete, isStreaming }: Props)
                   code({ inline, className, children, ...props }: any) {
                     const match = /language-(\w+)/.exec(className || "");
                     return !inline && match ? (
-                      <SyntaxHighlighter
-                        style={oneDark}
-                        language={match[1]}
-                        PreTag="div"
-                        className="rounded-lg !mt-2 !mb-2 text-xs"
-                        {...props}
-                      >
-                        {String(children).replace(/\n$/, "")}
-                      </SyntaxHighlighter>
+                      <div className="overflow-x-auto -mx-4 px-4">
+                        <SyntaxHighlighter
+                          style={oneDark}
+                          language={match[1]}
+                          PreTag="div"
+                          className="rounded-lg !mt-2 !mb-2 text-xs"
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, "")}
+                        </SyntaxHighlighter>
+                      </div>
                     ) : (
                       <code
-                        className="bg-gray-700 px-1 py-0.5 rounded text-xs font-mono"
+                        className="bg-gray-700 px-1 py-0.5 rounded text-xs font-mono break-all"
                         {...props}
                       >
                         {children}

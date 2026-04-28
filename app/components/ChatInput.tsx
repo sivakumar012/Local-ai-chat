@@ -40,7 +40,7 @@ export default function ChatInput({ onSend, disabled, isStreaming, onStop }: Pro
   }
 
   return (
-    <div className="border-t border-gray-700 bg-gray-900 px-4 py-4">
+    <div className="border-t border-gray-700 bg-gray-900 px-3 sm:px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0">
       <div className="max-w-3xl mx-auto flex items-end gap-3 bg-gray-800 rounded-2xl px-4 py-3 border border-gray-600 focus-within:border-indigo-500 transition-colors">
         <textarea
           ref={textareaRef}
@@ -72,7 +72,7 @@ export default function ChatInput({ onSend, disabled, isStreaming, onStop }: Pro
           </button>
         )}
       </div>
-      <p className="text-center text-xs text-gray-600 mt-2">
+      <p className="text-center text-xs text-gray-600 mt-2 hidden sm:block">
         AI can make mistakes. Verify important information.
       </p>
     </div>

@@ -25,7 +25,7 @@ export interface ChatSettings {
 }
 
 export const DEFAULT_SETTINGS: ChatSettings = {
-  model: "gemma-4-e4b",
+  model: "google/gemma-4-e4b",
   temperature: 0.7,
   maxTokens: 1000,
 };
