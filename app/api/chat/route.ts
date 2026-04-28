@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { trimMessagesToLimit } from "@/app/lib/tokenUtils";
 import { MAX_CONTEXT_TOKENS, Message } from "@/app/lib/types";
+import { logger } from "@/app/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ const DEFAULT_BASE_URL = process.env.LLM_BASE_URL ?? "http://127.0.0.1:1234";
 const API_PATH = process.env.LLM_API_PATH ?? "/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
+  const requestStart = Date.now();
+
   try {
     const body = await req.json();
     const {
@@ -26,6 +29,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      logger.warn("api.chat.badRequest", { reason: "messages array is required" });
       return Response.json({ error: "messages array is required" }, { status: 400 });
     }
 
@@ -34,6 +38,13 @@ export async function POST(req: NextRequest) {
 
     // Trim context to stay within token limit
     const trimmed = trimMessagesToLimit(messages, MAX_CONTEXT_TOKENS);
+
+    logger.info("api.chat.request", {
+      model,
+      messageCount: trimmed.length,
+      temperature,
+      maxTokens: max_tokens,
+    });
 
     // Forward to local LLM with streaming
     let llmResponse: Response;
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
       const message = err instanceof Error ? err.message : String(err);
       const isRefused =
         message.includes("ECONNREFUSED") || message.includes("fetch failed");
+      logger.error("api.chat.llm.unreachable", { error: message });
       return Response.json(
         {
           error: isRefused
@@ -65,6 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (!llmResponse.ok) {
       const text = await llmResponse.text();
+      logger.error("api.chat.llm.error", { status: llmResponse.status });
       return Response.json(
         { error: `LLM server error ${llmResponse.status}: ${text}` },
         { status: 503 }
@@ -79,6 +92,7 @@ export async function POST(req: NextRequest) {
     (async () => {
       const reader = llmResponse.body!.getReader();
       const decoder = new TextDecoder();
+      let tokenCount = 0;
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -91,12 +105,18 @@ export async function POST(req: NextRequest) {
             const data = line.slice(6).trim();
             if (data === "[DONE]") {
               await writer.write(encoder.encode("data: [DONE]\n\n"));
+              logger.info("api.chat.stream.done", {
+                model,
+                tokenCount,
+                durationMs: Date.now() - requestStart,
+              });
               continue;
             }
             try {
               const parsed = JSON.parse(data);
               const delta = parsed?.choices?.[0]?.delta?.content;
               if (delta !== undefined && delta !== null) {
+                tokenCount++;
                 await writer.write(
                   encoder.encode(`data: ${JSON.stringify({ content: delta })}\n\n`)
                 );
@@ -108,6 +128,7 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Stream error";
+        logger.error("api.chat.stream.error", { error: msg });
         await writer.write(
           encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`)
         );
@@ -125,6 +146,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal server error";
+    logger.error("api.chat.unhandled", { error: message });
     return Response.json({ error: message }, { status: 500 });
   }
 }

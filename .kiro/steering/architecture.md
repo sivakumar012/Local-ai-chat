@@ -27,7 +27,10 @@ local-ai-chat/
 │   │   └── SessionProviderWrapper.tsx   # NextAuth client SessionProvider
 │   ├── lib/
 │   │   ├── types.ts                     # Shared interfaces and constants
-│   │   └── tokenUtils.ts                # Token estimation + context trimming
+│   │   ├── tokenUtils.ts                # Token estimation + context trimming
+│   │   ├── firebase.ts                  # Firebase app + Firestore db singleton
+│   │   ├── firestoreService.ts          # All Firestore read/write operations
+│   │   └── logger.ts                    # Structured logger (JSON in prod, colour in dev)
 │   ├── login/page.tsx                   # Google sign-in page
 │   ├── store/
 │   │   ├── chatStore.ts                 # Conversations + messages (Zustand)

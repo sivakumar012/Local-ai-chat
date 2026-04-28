@@ -1,18 +1,76 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─── Helper functions ────────────────────────────────────────────────────
+
+    // True when the request comes from a signed-in user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // True when the authenticated user's uid matches the path segment
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate a Conversation document on create/update
+    function isValidConversation() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'title', 'createdAt', 'updatedAt',
+                               'model', 'temperature', 'maxTokens', 'userId'])
+          && d.id is string
+          && d.title is string && d.title.size() <= 200
+          && d.createdAt is int
+          && d.updatedAt is int
+          && d.model is string && d.model.size() <= 100
+          && d.temperature is float
+          && d.maxTokens is int
+          && d.userId == request.auth.uid;  // owner field must match caller
+    }
+
+    // Validate a Message document on create
+    function isValidMessage() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'role', 'content', 'createdAt', 'conversationId', 'userId'])
+          && d.id is string
+          && d.role in ['system', 'user', 'assistant']
+          && d.content is string && d.content.size() <= 32768  // 32 KB cap
+          && d.createdAt is int
+          && d.conversationId is string
+          && d.userId == request.auth.uid;
+    }
+
+    // ─── /users/{userId} ─────────────────────────────────────────────────────
+    // Stores per-user preferences (llmBaseUrl, setupComplete)
+    match /users/{userId} {
+      allow read:   if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // ─── /users/{userId}/conversations/{conversationId} ──────────────────────
+    match /users/{userId}/conversations/{conversationId} {
+      allow read:   if isOwner(userId);
+      allow create: if isOwner(userId) && isValidConversation();
+      allow update: if isOwner(userId) && isValidConversation();
+      allow delete: if isOwner(userId);
+
+      // ─── /users/{userId}/conversations/{conversationId}/messages/{messageId}
+      match /messages/{messageId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId) && isValidMessage();
+        // Messages are immutable once written — no update allowed
+        allow update: if false;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // ─── Deny everything else ────────────────────────────────────────────────
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 5, 28);
+      allow read, write: if false;
     }
   }
 }
