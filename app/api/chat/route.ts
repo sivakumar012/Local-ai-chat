@@ -20,12 +20,15 @@ export async function POST(req: NextRequest) {
       max_tokens = 1000,
       // Client can pass their configured LM Studio URL; falls back to env
       llmBaseUrl,
+      // Optional RAG context block to prepend to the system message
+      ragContext,
     } = body as {
       messages: Message[];
       model: string;
       temperature: number;
       max_tokens: number;
       llmBaseUrl?: string;
+      ragContext?: string;
     };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -36,14 +39,24 @@ export async function POST(req: NextRequest) {
     const baseUrl = (llmBaseUrl?.trim() || DEFAULT_BASE_URL).replace(/\/$/, "");
     const endpoint = `${baseUrl}${API_PATH}`;
 
+    // Inject RAG context into the system message when provided
+    const augmentedMessages: Message[] = ragContext
+      ? messages.map((m) =>
+          m.role === "system"
+            ? { ...m, content: `${ragContext}\n\n${m.content}` }
+            : m
+        )
+      : messages;
+
     // Trim context to stay within token limit
-    const trimmed = trimMessagesToLimit(messages, MAX_CONTEXT_TOKENS);
+    const trimmed = trimMessagesToLimit(augmentedMessages, MAX_CONTEXT_TOKENS);
 
     logger.info("api.chat.request", {
       model,
       messageCount: trimmed.length,
       temperature,
       maxTokens: max_tokens,
+      ragEnabled: !!ragContext,
     });
 
     // Forward to local LLM with streaming

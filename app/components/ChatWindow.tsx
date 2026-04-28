@@ -13,9 +13,12 @@ interface Props {
   isStreaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  ragPanelOpen: boolean;
+  onToggleRagPanel: () => void;
+  ragEnabled: boolean;
 }
 
-export default function ChatWindow({ streamingId, isStreaming, onSend, onStop }: Props) {
+export default function ChatWindow({ streamingId, isStreaming, onSend, onStop, ragPanelOpen, onToggleRagPanel, ragEnabled }: Props) {
   const { activeConversation, deleteMessage } = useChatStore();
   const conv = activeConversation();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -140,6 +143,9 @@ export default function ChatWindow({ streamingId, isStreaming, onSend, onStop }:
         disabled={isStreaming}
         isStreaming={isStreaming}
         onStop={onStop}
+        ragPanelOpen={ragPanelOpen}
+        onToggleRagPanel={onToggleRagPanel}
+        ragEnabled={ragEnabled}
       />
     </div>
   );

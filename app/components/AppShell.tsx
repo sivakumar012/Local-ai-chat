@@ -5,9 +5,11 @@ import { useSession } from "next-auth/react";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 import ServerSetup from "./ServerSetup";
+import RagPanel from "./RagPanel";
 import { useChatStore } from "@/app/store/chatStore";
 import { useUserStore } from "@/app/store/userStore";
 import { Message } from "@/app/lib/types";
+import { formatRagContext } from "@/app/lib/ragUtils";
 import { Bars3Icon } from "@heroicons/react/24/outline";
 
 export default function AppShell() {
@@ -30,6 +32,8 @@ export default function AppShell() {
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ragPanelOpen, setRagPanelOpen] = useState(false);
+  const [ragEnabled, setRagEnabled] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -64,6 +68,28 @@ export default function AppShell() {
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Retrieve RAG context if documents are available
+      let ragContext: string | undefined;
+      if (ragEnabled) {
+        try {
+          const ragRes = await fetch("/api/rag/retrieve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: text, llmBaseUrl }),
+          });
+          if (ragRes.ok) {
+            const ragData = await ragRes.json() as {
+              results: Array<{ text: string; documentName: string; score: number }>;
+            };
+            if (ragData.results.length > 0) {
+              ragContext = formatRagContext(ragData.results);
+            }
+          }
+        } catch {
+          // RAG retrieval failure is non-fatal — continue without context
+        }
+      }
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -73,8 +99,8 @@ export default function AppShell() {
             model: latestConv.model,
             temperature: latestConv.temperature,
             max_tokens: latestConv.maxTokens,
-            // Pass the user-configured LM Studio URL
             llmBaseUrl,
+            ...(ragContext ? { ragContext } : {}),
           }),
           signal: controller.signal,
         });
@@ -201,8 +227,21 @@ export default function AppShell() {
           isStreaming={isStreaming}
           onSend={handleSend}
           onStop={handleStop}
+          ragPanelOpen={ragPanelOpen}
+          onToggleRagPanel={() => setRagPanelOpen((v) => !v)}
+          ragEnabled={ragEnabled}
         />
       </div>
+
+      {/* RAG document panel — slides in from the right */}
+      {ragPanelOpen && session?.user?.id && (
+        <RagPanel
+          userId={session.user.id}
+          llmBaseUrl={llmBaseUrl}
+          onClose={() => setRagPanelOpen(false)}
+          onDocumentsChange={setRagEnabled}
+        />
+      )}
     </div>
   );
 }

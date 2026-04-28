@@ -51,6 +51,23 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // ─── /users/{userId}/documents/{documentId} ──────────────────────────────
+    match /users/{userId}/documents/{documentId} {
+      allow read:   if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && request.resource.data.keys().hasAll(['id','userId','name','status','createdAt','updatedAt'])
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      // ─── /users/{userId}/documents/{documentId}/chunks/{chunkId}
+      // Chunks are written server-side via Admin SDK — client read-only
+      match /chunks/{chunkId} {
+        allow read:   if isOwner(userId);
+        allow write:  if false; // Admin SDK only
+      }
+    }
+
     // ─── /users/{userId}/conversations/{conversationId} ──────────────────────
     match /users/{userId}/conversations/{conversationId} {
       allow read:   if isOwner(userId);
