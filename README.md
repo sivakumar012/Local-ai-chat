@@ -94,6 +94,7 @@ A production-ready, full-stack ChatGPT-like interface that runs entirely on your
 @tailwindcss/typography ^0.5.19
 @types/react-syntax-highlighter ^15.5.13
 @types/uuid ^10.0.0
+firebase 12.12.1
 next 16.2.4
 next-auth ^5.0.0-beta (beta)
 react 19.2.4
