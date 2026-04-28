@@ -796,88 +796,6 @@ To reset the setup screen (re-show the URL configuration): call `useUserStore.ge
 
 ---
 
-## Troubleshooting
-
-**Redirected to /login on every load**
-- Check that AUTH_SECRET, AUTH_GOOGLE_ID, and AUTH_GOOGLE_SECRET are set in .env.local.
-- Verify the Google OAuth redirect URI matches exactly: http://localhost:3000/api/auth/callback/google.
-
-**Google sign-in fails with redirect_uri_mismatch**
-- The redirect URI in Google Cloud Console must exactly match NEXTAUTH_URL + /api/auth/callback/google.
-
-**Setup screen appears every time**
-- The userStore is persisted to localStorage. If localStorage is cleared or blocked, setupComplete resets to false.
-
-**Cannot connect to LLM server**
-- Confirm LM Studio is open and the server is started (green indicator).
-- Confirm a model is loaded.
-- Check the URL in the sidebar footer matches what LM Studio shows.
-- Use Test Connection to diagnose.
-
-**LLM server error 400**
-- Ensure the API path is /v1/chat/completions (OpenAI-compatible endpoint), not /api/v1/chat (LM Studio stateful API).
-- The correct LLM_API_PATH in .env.local is /v1/chat/completions.
-
-**Blank or empty assistant responses**
-- Check LM Studio server logs for errors.
-- Try increasing max_tokens in model settings.
-
-**Responses cut off early**
-- Increase max_tokens in the gear icon model settings modal (up to 32000).
-
-**localStorage full**
-- Export important conversations via the download icon, then delete old ones.
-- Consider upgrading to SQLite.
-
----
-
-## Roadmap
-
-Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
-
-### ✅ Done (v0.1 → v0.3)
-
-- Core chat UI — sidebar, message bubbles, auto-scroll, markdown, code highlighting
-- Streaming responses (SSE) with stop-generation support
-- Multi-session conversations with localStorage persistence
-- Per-conversation model settings (model name, temperature, max tokens)
-- Token estimation and context trimming (8k limit)
-- Copy, delete, rename, export, clear actions
-- Google SSO via NextAuth.js v5
-- Route protection via proxy middleware
-- First-run LM Studio URL setup screen with connection test
-- User preferences store (URL, setup state) persisted to localStorage
-- Inline URL editor in sidebar footer
-- **Firestore integration** — conversations, messages, and user prefs persisted to Cloud Firestore
-- **Firestore security rules** — owner-only access, field validation, immutable messages, catch-all deny
-- **Structured observability** — JSON-line logger on all API routes and Firestore operations
-
-### ⬜ Planned
-
-| Priority | Feature | Notes |
-|----------|---------|-------|
-| 🔴 High | Regenerate last response | Remove last assistant turn, re-send last user message |
-| 🔴 High | System prompt editor | Per-conversation, editable from model settings modal |
-| 🔴 High | Multi-model switcher | Fetch `GET /v1/models` to list loaded models as a dropdown |
-| 🟡 Medium | Conversation search | Filter sidebar by title or message content |
-| 🟡 Medium | SQLite persistence (v2) | Replace localStorage with Prisma + SQLite |
-| 🟡 Medium | Keyboard shortcuts | `Cmd+K` new chat, `Cmd+Shift+S` sidebar toggle |
-| 🟡 Medium | Message timestamps | Relative timestamps on hover |
-| 🟡 Medium | Conversation folders / tags | Group and organise conversations |
-| 🟢 Low | Image upload (vision models) | Base64 encode, include in messages array |
-| 🟢 Low | Export to PDF / Markdown | In addition to existing JSON export |
-| 🟢 Low | Prompt templates | Quick-start prompts on empty chat screen |
-| 🟢 Low | Token usage display | Per-message and conversation totals |
-| 🟢 Low | Dark / light theme toggle | Persist in userStore |
-| 🟢 Low | PWA / offline support | Install as app, offline chat history |
-
-### Known Issues / Tech Debt
-
-- `confirm()` dialogs should be replaced with a proper modal component
-- No rate limiting on `/api/chat`
-
----
-
 ## Deployment
 
 This app is designed for **local use** — the LLM never leaves your machine. The Next.js frontend and API layer can also be deployed to a server so teammates on the same network or VPN can share one LM Studio instance.
@@ -1018,3 +936,87 @@ docker run -p 3000:3000 \
 - [ ] Google Cloud Console redirect URI matches `NEXTAUTH_URL/api/auth/callback/google`
 - [ ] LM Studio is running and reachable from the deployment environment
 - [ ] `.env.local` is **not** committed (it is in `.gitignore` by default in Next.js)
+
+---
+
+## Troubleshooting
+
+**Redirected to /login on every load**
+- Check that AUTH_SECRET, AUTH_GOOGLE_ID, and AUTH_GOOGLE_SECRET are set in .env.local.
+- Verify the Google OAuth redirect URI matches exactly: http://localhost:3000/api/auth/callback/google.
+
+**Google sign-in fails with redirect_uri_mismatch**
+- The redirect URI in Google Cloud Console must exactly match NEXTAUTH_URL + /api/auth/callback/google.
+
+**Setup screen appears every time**
+- The userStore is persisted to localStorage. If localStorage is cleared or blocked, setupComplete resets to false.
+
+**Cannot connect to LLM server**
+- Confirm LM Studio is open and the server is started (green indicator).
+- Confirm a model is loaded.
+- Check the URL in the sidebar footer matches what LM Studio shows.
+- Use Test Connection to diagnose.
+
+**LLM server error 400**
+- Ensure the API path is /v1/chat/completions (OpenAI-compatible endpoint), not /api/v1/chat (LM Studio stateful API).
+- The correct LLM_API_PATH in .env.local is /v1/chat/completions.
+
+**Blank or empty assistant responses**
+- Check LM Studio server logs for errors.
+- Try increasing max_tokens in model settings.
+
+**Responses cut off early**
+- Increase max_tokens in the gear icon model settings modal (up to 32000).
+
+**localStorage full**
+- Export important conversations via the download icon, then delete old ones.
+- Consider upgrading to SQLite.
+
+---
+
+## Roadmap
+
+Full task tracking is in [TASKS.md](./TASKS.md). Summary below.
+
+### ✅ Done (v0.1 → v0.3)
+
+- Core chat UI — sidebar, message bubbles, auto-scroll, markdown, code highlighting
+- Streaming responses (SSE) with stop-generation support
+- Multi-session conversations with localStorage persistence
+- Per-conversation model settings (model name, temperature, max tokens)
+- Token estimation and context trimming (8k limit)
+- Copy, delete, rename, export, clear actions
+- Google SSO via NextAuth.js v5
+- Route protection via proxy middleware
+- First-run LM Studio URL setup screen with connection test
+- User preferences store (URL, setup state) persisted to localStorage
+- Inline URL editor in sidebar footer
+- **Firestore integration** — conversations, messages, and user prefs persisted to Cloud Firestore
+- **Firestore security rules** — owner-only access, field validation, immutable messages, catch-all deny
+- **Structured observability** — JSON-line logger on all API routes and Firestore operations
+
+### ⬜ Planned
+
+| Priority | Feature | Notes |
+|----------|---------|-------|
+| 🔴 High | Regenerate last response | Remove last assistant turn, re-send last user message |
+| 🔴 High | System prompt editor | Per-conversation, editable from model settings modal |
+| 🔴 High | Multi-model switcher | Fetch `GET /v1/models` to list loaded models as a dropdown |
+| 🟡 Medium | Conversation search | Filter sidebar by title or message content |
+| 🟡 Medium | SQLite persistence (v2) | Replace localStorage with Prisma + SQLite |
+| 🟡 Medium | Keyboard shortcuts | `Cmd+K` new chat, `Cmd+Shift+S` sidebar toggle |
+| 🟡 Medium | Message timestamps | Relative timestamps on hover |
+| 🟡 Medium | Conversation folders / tags | Group and organise conversations |
+| 🟢 Low | Image upload (vision models) | Base64 encode, include in messages array |
+| 🟢 Low | Export to PDF / Markdown | In addition to existing JSON export |
+| 🟢 Low | Prompt templates | Quick-start prompts on empty chat screen |
+| 🟢 Low | Token usage display | Per-message and conversation totals |
+| 🟢 Low | Dark / light theme toggle | Persist in userStore |
+| 🟢 Low | PWA / offline support | Install as app, offline chat history |
+
+### Known Issues / Tech Debt
+
+- `confirm()` dialogs should be replaced with a proper modal component
+- No rate limiting on `/api/chat`
+
+---
